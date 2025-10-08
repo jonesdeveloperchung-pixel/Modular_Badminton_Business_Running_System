@@ -1,0 +1,136 @@
+services:
+  # Database
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: badminton_system
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - badminton_network
+
+  # User Management Service
+  user_service:
+    build:
+      context: ../user_service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/badminton_system
+      - SECRET_KEY=super-secret-key-that-should-be-rotated
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+    networks:
+      - badminton_network
+    restart: unless-stopped
+
+  # Court Reservation Service
+  court_service:
+    build:
+      context: ../court_reservation
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/badminton_system
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+    networks:
+      - badminton_network
+    restart: unless-stopped
+
+  # Match Scoring Service
+  match_service:
+    build:
+      context: ../match_scoring
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/badminton_system
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+    networks:
+      - badminton_network
+    restart: unless-stopped
+
+  # Inventory & Maintenance Service
+  inventory_service:
+    build:
+      context: ../inventory_maintenance
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/badminton_system
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+    networks:
+      - badminton_network
+    restart: unless-stopped
+
+  # Analytics Service
+  analytics_service:
+    build:
+      context: ../analytics
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/badminton_system
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+    networks:
+      - badminton_network
+    restart: unless-stopped
+
+  # API Gateway
+  api_gateway:
+    build:
+      context: ../api_gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - USER_SERVICE_URL=http://user_service:8000
+      - COURT_SERVICE_URL=http://court_service:8001
+      - MATCH_SERVICE_URL=http://match_service:8002
+      - INVENTORY_SERVICE_URL=http://inventory_service:8003
+      - ANALYTICS_SERVICE_URL=http://analytics_service:8004
+      - SECRET_KEY=super-secret-key-that-should-be-rotated
+      - LOG_LEVEL=INFO
+    depends_on:
+      - user_service
+      - court_service
+      - match_service
+      - inventory_service
+      - analytics_service
+    networks:
+      - badminton_network
+    restart: unless-stopped
+
+  # Redis for caching (optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - badminton_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  badminton_network:
+    driver: bridge
